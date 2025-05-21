@@ -17,90 +17,92 @@ def main():
     duck_conn = duckutil.initialize_duckdb("12GB")
     print("[INFO] DuckDB connection initialized.")
 
-    prefetchUserData(duck_conn)
-    prejoinUserOrgData(duck_conn)
-    prejoinuserorgroledata(duck_conn)
-    prejoinACBPData(duck_conn)
-    prejoinusercourseprogramenrollment(duck_conn)
+    print(f"""
+        ##########################################################
+        ###            
+        ###             Content
+        ### 
+        ##########################################################
+    """)
+    aggregateContentRatingsData(duck_conn)
+    prejoinContentWithRatingsData(duck_conn)
+    prejoinContentWithRatingsAndOrgData(duck_conn)
 
+    print(f"""
+        ##########################################################
+        ###            
+        ###             User
+        ### 
+        ##########################################################
+    """)
+    prefetchUserOrgData(duck_conn)
+    prejoinUserOrgRoleData(duck_conn)
+    prejoinUserOrgRoleKarmaPointsAndClaps(duck_conn)
+    print(f"""
+        ##########################################################
+        ###            
+        ###             Enrolment
+        ### 
+        ##########################################################
+    """)
+    prejoinEnrolmentContentData(duck_conn)
+    prejoinUserOrgContentEnrolmentData(duck_conn)
+    prejoinEnrolmentBatch(duck_conn)
     print("[INFO] DuckDB connection closed.")
 
-def prefetchUserData(duckdb_conn):
-    print("\n[INFO] Prefetching User Data...")
+def prefetchUserOrgData(duckdb_conn):
+   prefetchDataAndOutputToComputeFile(duckdb_conn,QueryConstants.PRE_FETCH_USER_ORG_DATA,
+        ParquetFileConstants.USER_ORG_COMPUTED_PARQUET_FILE,"User & Org")
+
+def prejoinUserOrgRoleData(duckdb_conn):
+   prefetchDataAndOutputToComputeFile(duckdb_conn,QueryConstants.PRE_FETCH_USER_ORG_ROLE_DATA,
+        ParquetFileConstants.USER_ORG_ROLE_COMPUTED_PARQUET_FILE,"User, Org & Role")
+
+def prejoinEnrolmentContentData(duckdb_conn):
+    prefetchDataAndOutputToComputeFile(duckdb_conn,QueryConstants.PREFETCH_ENROLMENT_WITH_CONTENT_DATA,
+            ParquetFileConstants.CONTENT_PROGRAM_ENROLMENT_COMPUTED_FILE,"Enrolment & Content Data")
+
+def prejoinUserOrgContentEnrolmentData(duckdb_conn):
+    prefetchDataAndOutputToComputeFile(duckdb_conn,QueryConstants.PREFETCH_ENROLMENT_WITH_CONTENT_DATA_USER_ORG_ROLE_DATA,
+            ParquetFileConstants.USER_ORG_CONTENT_PROGRAM_ENROLMENT_COMPUTED_FILE,"User Org Enrolment & Content Data")
+
+def aggregateContentRatingsData(duckdb_conn):
+    prefetchDataAndOutputToComputeFile(duckdb_conn,QueryConstants.PREFETCH_CONTENT_RATINGS,
+            ParquetFileConstants.CONTENT_RATINGS_COMPUTED_FILE,"Content Ratings Pre Compute")
+
+def prejoinContentWithRatingsData(duckdb_conn):
+    prefetchDataAndOutputToComputeFile(duckdb_conn,QueryConstants.PREFETCH_CONTENT_WITH_RATINGS,
+            ParquetFileConstants.CONTENT_WITH_RATINGS_COMPUTED_FILE,"Content Ratings Joined Data")
+
+def prejoinContentWithRatingsAndOrgData(duckdb_conn):
+     prefetchDataAndOutputToComputeFile(duckdb_conn,QueryConstants.PREFETCH_MASTER_CONTENT_WITH_RATINGS_ORG_OWNERSHIP,
+            ParquetFileConstants.CONTENT_MASTER,"Content Master Created")
+
+def prejoinUserOrgRoleKarmaPointsAndClaps(duckdb_conn):
+    prefetchDataAndOutputToComputeFile(duckdb_conn,QueryConstants.PREFETCH_MASTER_USER_WITH_CLAPS_AND_POINTS,
+            ParquetFileConstants.USER_MASTER,"User Master Created")
+
+def prejoinEnrolmentBatch(duckdb_conn):
+    prefetchDataAndOutputToComputeFile(duckdb_conn,QueryConstants.PREFETCH_MASTER_ENROLMENT_WITH_BATCH,
+            ParquetFileConstants.ENROLMENT_MASTER,"User Master Created")
+
+def prefetchDataAndOutputToComputeFile(duckdb_conn,query,output,category):
+    output_path = Path(output)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    print(f"\n[INFO] Prefetching {category} Data...")
+    print(output)
     start_time = time.time()
 
-    query = QueryConstants.PRE_FETCH_USER_DATA
+    
     duckutil.executeQuery(duckdb_conn, f"""
-    COPY ({query}) TO '{ParquetFileConstants.USER_COMPUTED_PARQUET_FILE}' 
+    COPY ({query}) TO '{output}' 
     (FORMAT PARQUET, COMPRESSION ZSTD);
     """)
 
-    print(f"[SUCCESS] User data fetched and saved to {ParquetFileConstants.USER_COMPUTED_PARQUET_FILE}.")
-    fetchPrintDFCount(duckdb_conn,ParquetFileConstants.USER_COMPUTED_PARQUET_FILE,"User")
+    print(f"[SUCCESS] User data fetched and saved to {output}.")
+    fetchPrintDFCount(duckdb_conn,output,category)
     
     print(f"[INFO] User Data Prefetch Completed in {round(time.time() - start_time, 2)} seconds.")
-
-def prejoinACBPData(duckdb_conn):
-    print("\n[INFO] Prefetching ACBP Data...")
-    start_time = time.time()
-
-    query = QueryConstants.PRE_FETCH_ACBP_DETAILS
-    duckutil.executeQuery(duckdb_conn, f"""
-    COPY ({query}) TO '{ParquetFileConstants.ACBP_COMPUTED_PARQUET_FILE}' 
-    (FORMAT PARQUET, COMPRESSION ZSTD);
-    """)
-    
-    print(f"[SUCCESS] ACBP data fetched and saved to {ParquetFileConstants.ACBP_COMPUTED_PARQUET_FILE}.")
-    
-    fetchPrintDFCount(duckdb_conn,ParquetFileConstants.ACBP_COMPUTED_PARQUET_FILE,"ACBP")
-
-    print(f"[INFO] ACBP Data Prefetch Completed in {round(time.time() - start_time, 2)} seconds.")
-
-def prejoinUserOrgData(duckdb_conn):
-    print("\n[INFO] Prefetching User-Org Data...")
-    start_time = time.time()
-
-    query = QueryConstants.PRE_FETCH_ALL_USER_ORG_DATA
-    duckutil.executeQuery(duckdb_conn, f"""
-    COPY ({query}) TO '{ParquetFileConstants.USER_ORG_COMPUTED_PARQUET_FILE}' 
-    (FORMAT PARQUET, COMPRESSION ZSTD);
-    """)
-
-    print(f"[SUCCESS] User-Org data fetched and saved to {ParquetFileConstants.USER_ORG_COMPUTED_PARQUET_FILE}.")
-    
-    fetchPrintDFCount(duckdb_conn,ParquetFileConstants.USER_ORG_COMPUTED_PARQUET_FILE,"User and Org")
-  
-
-    print(f"[INFO] User-Org Data Prefetch Completed in {round(time.time() - start_time, 2)} seconds.")
-
-def prejoinuserorgroledata(duckdb_conn):
-    print("\n[INFO] Prefetching User-Org-Role Data...")
-    start_time = time.time()
-
-    query = QueryConstants.PRE_FETCH_USER_ORG_ROLE_DATA
-    duckutil.executeQuery(duckdb_conn, f"""
-    COPY ({query}) TO '{ParquetFileConstants.USER_ORG_ROLE_COMPUTED_PARQUET_FILE}' 
-    (FORMAT PARQUET, COMPRESSION ZSTD);
-    """)
-    
-    print(f"[SUCCESS] User-Org-Role data fetched and saved to {ParquetFileConstants.USER_ORG_ROLE_COMPUTED_PARQUET_FILE}.")
-    
-    fetchPrintDFCount(duckdb_conn,ParquetFileConstants.USER_ORG_ROLE_COMPUTED_PARQUET_FILE,"User, Org & Role")
-
-    print(f"[INFO] User-Org-Role Data Prefetch Completed in {round(time.time() - start_time, 2)} seconds.")
-
-def prejoinusercourseprogramenrollment(duckdb_conn):
-    print("\n[INFO] Prefetching User-Org-Role Data...")
-    start_time = time.time()
-    query = QueryConstants.PRE_FETCH_ENROLLMENT_DATA
-    duckutil.executeQuery(duckdb_conn, f"""
-        COPY ({query}) TO '{ParquetFileConstants.USER_COURSE_PROGRAM_ENROLMENT_FILE}' 
-        (FORMAT PARQUET, COMPRESSION ZSTD);
-        """)
-    print(f"[SUCCESS] User-Org-Role data fetched and saved to {ParquetFileConstants.USER_COURSE_PROGRAM_ENROLMENT_FILE}.")
-    
-    fetchPrintDFCount(duckdb_conn,ParquetFileConstants.USER_COURSE_PROGRAM_ENROLMENT_FILE,"User, Course Program Enrolment")
-    print(f"[INFO] User-Org-Role Data Prefetch Completed in {round(time.time() - start_time, 2)} seconds.")
 
 def fetchPrintDFCount(duckdb_conn,tableName,type):
     queryToExecute = f"SELECT COUNT(*) AS count FROM read_parquet('{tableName}')"
